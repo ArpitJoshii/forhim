@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telegraph Proxy</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #1a1a2e; color: #eee; }
+        .info { color: #888; margin-bottom: 20px; }
+        .error { color: #ff6b6b; }
+        .success { color: #51cf66; }
+    </style>
+</head>
+<body>
+    <h1>🔐 Telegraph CORS Proxy</h1>
+    <div class="info">This proxy fetches Telegraph pages and adds CORS headers</div>
+    <div id="status"></div>
+
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const path = params.get('path');
+
+        if (!path) {
+            document.getElementById('status').innerHTML = 
+                '<div class="error">❌ Missing "path" parameter</div>' +
+                '<div>Usage: proxy.html?path=Photo-Gallary-02-28</div>';
+            return;
+        }
+
+        const apiUrl = `https://api.telegra.ph/getPage/${encodeURIComponent(path)}?return_content=true`;
+
+        fetch(apiUrl, {
+            method: 'GET',
+            cache: 'no-store'
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            document.getElementById('status').innerHTML = 
+                '<div class="success">✅ Successfully fetched: ' + path + '</div>' +
+                '<div>Page exists: ' + (data.ok ? 'Yes' : 'No') + '</div>' +
+                '<div>Title: ' + (data.result ? data.result.title : 'N/A') + '</div>';
+            
+            // Add CORS headers
+            const headers = new Headers({
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type',
+                'Content-Type': 'application/json'
+            });
+
+            // Create a new response with CORS headers
+            const corsResponse = new Response(JSON.stringify(data), {
+                status: 200,
+                headers: headers
+            });
+
+            // For browsers that support it, respond with CORS-enabled data
+            console.log('Proxy response:', data);
+        })
+        .catch(error => {
+            document.getElementById('status').innerHTML = 
+                '<div class="error">❌ Error: ' + error.message + '</div>';
+            
+            const headers = new Headers({
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type',
+                'Content-Type': 'application/json'
+            });
+
+            const errorResponse = new Response(JSON.stringify({
+                ok: false,
+                error: error.message
+            }), {
+                status: 200,
+                headers: headers
+            });
+
+            console.log('Proxy error response:', error);
+        });
+    </script>
+</body>
+</html>
