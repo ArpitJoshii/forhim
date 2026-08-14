@@ -28,18 +28,8 @@ body{margin:0;font-family:Inter,Arial,Helvetica,sans-serif;background:linear-gra
 .modal-footer{padding:14px 18px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.navigation{display:flex;gap:7px}.nav-btn{border:0;background:#f3f4f6;color:#374151;padding:10px 13px;border-radius:9px;cursor:pointer;font-weight:700}.nav-btn:hover:not(:disabled){background:#e5e7eb}.nav-btn:disabled{opacity:.4;cursor:not-allowed}.footer-actions{display:flex;gap:7px;flex-wrap:wrap}
 .toast{position:fixed;bottom:25px;left:50%;transform:translateX(-50%) translateY(100px);background:#111827;color:#fff;padding:12px 18px;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.25);z-index:20000;opacity:0;transition:.3s;pointer-events:none;font-size:14px}.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
 .site-footer{text-align:center;padding:30px 20px;color:#6b7280;font-size:13px}
-
-/* IFRAME STYLES */
-.iframe-container{width:100%;height:65vh;min-height:450px;background:#fff;border-radius:12px;overflow:hidden;border:1px solid var(--border);position:relative}
-.iframe-container iframe{width:100%;height:100%;border:0;display:block}
-.iframe-error{display:none;position:absolute;inset:0;background:#fff;padding:40px;text-align:center}
-.iframe-error.show{display:flex;flex-direction:column;align-items:center;justify-content:center}
-.iframe-error .icon{font-size:60px;margin-bottom:15px}
-.iframe-error h3{margin:0 0 10px;color:var(--dark)}
-.iframe-error p{margin:0 0 20px;color:var(--muted);max-width:400px}
-
 @media(max-width:1000px){.gallery-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:650px){.header{padding:35px 15px 45px}.container{padding:0 12px}.gallery-grid{grid-template-columns:1fr}.controls{padding:13px}.search-box{min-width:100%}.filters{width:100%;overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px}.filter-btn{flex:0 0 auto}.modal{padding:8px}.modal-box{border-radius:14px}.modal-content{max-height:62vh}.modal-footer{flex-direction:column;align-items:stretch}.navigation,.footer-actions{width:100%}.navigation .nav-btn,.footer-actions .btn{flex:1}.iframe-container{height:55vh;min-height:380px}}
+@media(max-width:650px){.header{padding:35px 15px 45px}.container{padding:0 12px}.gallery-grid{grid-template-columns:1fr}.controls{padding:13px}.search-box{min-width:100%}.filters{width:100%;overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px}.filter-btn{flex:0 0 auto}.modal{padding:8px}.modal-box{border-radius:14px}.modal-content{max-height:62vh}.modal-footer{flex-direction:column;align-items:stretch}.navigation,.footer-actions{width:100%}.navigation .nav-btn,.footer-actions .btn{flex:1}}
 </style>
 </head>
 <body>
@@ -114,13 +104,16 @@ body{margin:0;font-family:Inter,Arial,Helvetica,sans-serif;background:linear-gra
 
 <script>
 /* ============================================================
-   CONFIGURATION
+   CONFIGURATION - USING PUBLIC CORS PROXY
    ============================================================ */
 
 const START_DATE = "2023-11-01";
 const END_DATE   = "2024-02-28";
 const TELEGRAPH_BASE = "https://telegra.ph/Photo-Gallary-";
-const PROXY_URL = window.location.origin + window.location.pathname.replace(/\/index\.html$/, '/') + 'proxy.html';
+
+// Public CORS proxy that works with GitHub Pages
+const CORS_PROXY = "https://api.allorigins.win/raw?url=";
+
 const generateAllDates = true;
 const availableDates = [];
 
@@ -299,7 +292,7 @@ function escapeAttribute(value) {
 }
 
 /* ============================================================
-   OPEN PREVIEW (IFRAME FIRST - ALWAYS SHOWS SOMETHING)
+   OPEN PREVIEW
    ============================================================ */
 
 async function openPreview(id, pushHistory = true) {
@@ -321,58 +314,22 @@ async function openPreview(id, pushHistory = true) {
         history.pushState({ galleryId: id }, "", "#gallery-" + id);
     }
 
-    // ALWAYS show iframe first (even if it shows "refused to connect")
-    renderIframePreview(gallery);
-
-    // Try to get API data in background for thumbnail
-    if (!gallery.previewLoaded && !gallery.loading) {
-        loadTelegraphPreview(gallery);
+    if (gallery.previewLoaded && gallery.cachedPage) {
+        renderPreviewContent(gallery.cachedPage);
+        return;
     }
+
+    if (gallery.exists === false) {
+        renderErrorPreview(gallery);
+        return;
+    }
+
+    modalContent.innerHTML = `<div class="loading"><div class="spinner"></div><div>Loading Telegraph preview...</div></div>`;
+    await loadTelegraphPreview(gallery);
 }
 
 /* ============================================================
-   RENDER IFRAME (PRIMARY METHOD - ALWAYS WORKS)
-   ============================================================ */
-
-function renderIframePreview(gallery) {
-    modalContent.innerHTML = `
-        <div class="preview-content">
-            <div class="preview-note" style="margin-bottom:15px">
-                📌 Loading Telegraph gallery below. If you see "refused to connect", 
-                click "Open Gallery" or "New Tab" buttons below.
-            </div>
-            
-            <div class="iframe-container">
-                <iframe
-                    src="${escapeAttribute(gallery.url)}"
-                    title="Telegraph Photo Gallery"
-                    loading="eager"
-                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups">
-                </iframe>
-                <div class="iframe-error" id="iframeError">
-                    <div class="icon">⚠️</div>
-                    <h3>Unable to load gallery</h3>
-                    <p>This page cannot be displayed in a frame. Please open it in a new tab.</p>
-                    <a href="${escapeAttribute(gallery.url)}" target="_blank" rel="noopener noreferrer" class="btn btn-newtab">
-                        ↗ Open in New Tab
-                    </a>
-                </div>
-            </div>
-        </div>
-    `;
-
-    // Check if iframe loaded after 3 seconds
-    setTimeout(() => {
-        const iframe = modalContent.querySelector("iframe");
-        if (iframe && iframe.contentWindow && iframe.contentWindow.location.href === "about:blank") {
-            const errorDiv = modalContent.querySelector("#iframeError");
-            if (errorDiv) errorDiv.classList.add("show");
-        }
-    }, 3000);
-}
-
-/* ============================================================
-   TELEGRAPH API (FOR THUMBNAILS ONLY)
+   TELEGRAPH API (USING PUBLIC CORS PROXY)
    ============================================================ */
 
 async function loadTelegraphPreview(gallery) {
@@ -382,19 +339,32 @@ async function loadTelegraphPreview(gallery) {
     try {
         const pageUrl = new URL(gallery.url);
         const path = pageUrl.pathname.replace(/^\/+/, "");
-        const proxyUrl = `${PROXY_URL}?path=${encodeURIComponent(path)}`;
+        const apiUrl = `https://api.telegra.ph/getPage/${encodeURIComponent(path)}?return_content=true`;
         
-        const response = await fetch(proxyUrl, { method: "GET", cache: "no-store" });
-        if (!response.ok) throw new Error("HTTP " + response.status);
+        // Use public CORS proxy
+        const proxyUrl = CORS_PROXY + encodeURIComponent(apiUrl);
+        
+        const response = await fetch(proxyUrl, { 
+            method: "GET", 
+            cache: "no-store" 
+        });
+
+        if (!response.ok) {
+            throw new Error("HTTP " + response.status);
+        }
 
         const data = await response.json();
-        if (!data.ok || !data.result) throw new Error("Telegraph page not found");
+
+        if (!data.ok || !data.result) {
+            throw new Error("Telegraph page not found");
+        }
 
         gallery.exists = true;
         gallery.previewLoaded = true;
         gallery.cachedPage = data.result;
         gallery.previewImage = findFirstImage(data.result.content);
 
+        renderPreviewContent(data.result);
         updateCardImage(gallery);
         renderGrid();
 
@@ -402,6 +372,7 @@ async function loadTelegraphPreview(gallery) {
         console.warn("Telegraph API preview failed:", error);
         gallery.exists = false;
         gallery.previewLoaded = true;
+        renderErrorPreview(gallery);
         renderGrid();
     } finally {
         gallery.loading = false;
@@ -449,6 +420,98 @@ function updateCardImage(gallery) {
             preview.appendChild(img);
         }
     });
+}
+
+/* ============================================================
+   RENDER PREVIEW CONTENT
+   ============================================================ */
+
+function renderPreviewContent(page) {
+    modalContent.innerHTML = "";
+    const wrapper = document.createElement("div");
+    wrapper.className = "preview-content";
+
+    if (page.title) {
+        const title = document.createElement("h2");
+        title.textContent = page.title;
+        wrapper.appendChild(title);
+    }
+
+    if (Array.isArray(page.content) && page.content.length) {
+        page.content.forEach(node => {
+            const element = telegraphNodeToElement(node);
+            if (element) wrapper.appendChild(element);
+        });
+    } else {
+        const message = document.createElement("p");
+        message.textContent = "No preview content was returned.";
+        wrapper.appendChild(message);
+    }
+
+    modalContent.appendChild(wrapper);
+}
+
+/* ============================================================
+   RENDER ERROR PREVIEW
+   ============================================================ */
+
+function renderErrorPreview(gallery) {
+    modalContent.innerHTML = `
+        <div class="preview-content">
+            <div class="preview-error">
+                <div class="icon">⚠️</div>
+                <h3>Gallery not available</h3>
+                <p>This gallery page could not be loaded from Telegraph.</p>
+                <div style="margin-top:20px">
+                    <a href="${escapeAttribute(gallery.url)}" target="_blank" rel="noopener noreferrer" class="btn btn-newtab">
+                        ↗ Open Telegraph Gallery
+                    </a>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+/* ============================================================
+   TELEGRAPH NODE → SAFE ELEMENT
+   ============================================================ */
+
+function telegraphNodeToElement(node) {
+    if (typeof node === "string") {
+        const text = document.createTextNode(node);
+        const span = document.createElement("span");
+        span.appendChild(text);
+        return span;
+    }
+
+    if (!node || !node.tag) return null;
+
+    const allowedTags = ["p", "h3", "h4", "blockquote", "figure", "figcaption", "img", "a", "strong", "em", "br", "ul", "ol", "li", "code", "pre"];
+    if (!allowedTags.includes(node.tag)) return null;
+
+    const element = document.createElement(node.tag);
+
+    if (node.attrs) {
+        if (node.tag === "img" && node.attrs.src) {
+            element.src = node.attrs.src;
+            element.loading = "lazy";
+            element.alt = "";
+        }
+        if (node.tag === "a" && node.attrs.href) {
+            element.href = node.attrs.href;
+            element.target = "_blank";
+            element.rel = "noopener noreferrer";
+        }
+    }
+
+    if (Array.isArray(node.children)) {
+        node.children.forEach(child => {
+            const childElement = telegraphNodeToElement(child);
+            if (childElement) element.appendChild(childElement);
+        });
+    }
+
+    return element;
 }
 
 /* ============================================================
