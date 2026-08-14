@@ -28,6 +28,14 @@ body{margin:0;font-family:Inter,Arial,Helvetica,sans-serif;background:linear-gra
 .modal-footer{padding:14px 18px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.navigation{display:flex;gap:7px}.nav-btn{border:0;background:#f3f4f6;color:#374151;padding:10px 13px;border-radius:9px;cursor:pointer;font-weight:700}.nav-btn:hover:not(:disabled){background:#e5e7eb}.nav-btn:disabled{opacity:.4;cursor:not-allowed}.footer-actions{display:flex;gap:7px;flex-wrap:wrap}
 .toast{position:fixed;bottom:25px;left:50%;transform:translateX(-50%) translateY(100px);background:#111827;color:#fff;padding:12px 18px;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.25);z-index:20000;opacity:0;transition:.3s;pointer-events:none;font-size:14px}.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
 .site-footer{text-align:center;padding:30px 20px;color:#6b7280;font-size:13px}
+
+/* Debug panel */
+.debug-panel{position:fixed;top:10px;right:10px;background:#1a1a2e;color:#0f0;padding:15px;border-radius:8px;font-family:monospace;font-size:12px;max-width:400px;max-height:300px;overflow:auto;z-index:99999;box-shadow:0 5px 20px rgba(0,0,0,.5)}
+.debug-panel h4{margin:0 0 10px;color:#fff}
+.debug-panel .log{margin:3px 0}
+.debug-panel .error{color:#f66}
+.debug-panel .success{color:#6f6}
+
 @media(max-width:1000px){.gallery-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:650px){.header{padding:35px 15px 45px}.container{padding:0 12px}.gallery-grid{grid-template-columns:1fr}.controls{padding:13px}.search-box{min-width:100%}.filters{width:100%;overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px}.filter-btn{flex:0 0 auto}.modal{padding:8px}.modal-box{border-radius:14px}.modal-content{max-height:62vh}.modal-footer{flex-direction:column;align-items:stretch}.navigation,.footer-actions{width:100%}.navigation .nav-btn,.footer-actions .btn{flex:1}}
 </style>
@@ -102,20 +110,40 @@ body{margin:0;font-family:Inter,Arial,Helvetica,sans-serif;background:linear-gra
 
 <div id="toast" class="toast"></div>
 
+<!-- Debug Panel -->
+<div id="debugPanel" class="debug-panel">
+<h4>🔍 Debug Log</h4>
+<div id="debugLogs"></div>
+</div>
+
 <script>
 /* ============================================================
-   CONFIGURATION - USING PUBLIC CORS PROXY
+   DEBUG LOGGER
+   ============================================================ */
+
+const debugLogs = document.getElementById('debugLogs');
+
+function log(message, type = 'info') {
+    const div = document.createElement('div');
+    div.className = 'log ' + (type === 'error' ? 'error' : type === 'success' ? 'success' : '');
+    div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+    debugLogs.appendChild(div);
+    debugLogs.scrollTop = debugLogs.scrollHeight;
+    console.log(message);
+}
+
+/* ============================================================
+   CONFIGURATION
    ============================================================ */
 
 const START_DATE = "2023-11-01";
 const END_DATE   = "2024-02-28";
 const TELEGRAPH_BASE = "https://telegra.ph/Photo-Gallary-";
-
-// Public CORS proxy that works with GitHub Pages
-const CORS_PROXY = "https://api.allorigins.win/raw?url=";
-
 const generateAllDates = true;
 const availableDates = [];
+
+log("Starting gallery...");
+log(`Date range: ${START_DATE} to ${END_DATE}`);
 
 /* ============================================================
    DATE FUNCTIONS
@@ -157,6 +185,7 @@ function createDateList() {
         dates.push(`${year}-${month}-${day}`);
         current.setDate(current.getDate() + 1);
     }
+    log(`Created ${dates.length} dates`);
     return dates;
 }
 
@@ -180,6 +209,10 @@ let galleries = createDateList().map((dateString, index) => {
         loading: false
     };
 });
+
+log(`Total galleries: ${galleries.length}`);
+log(`First gallery: ${galleries[0].url}`);
+log(`Last gallery: ${galleries[galleries.length - 1].url}`);
 
 /* ============================================================
    STATE
@@ -302,6 +335,8 @@ async function openPreview(id, pushHistory = true) {
     currentGalleryIndex = index;
     const gallery = galleries[index];
 
+    log(`Opening preview: ${gallery.url}`);
+
     modalTitle.textContent = `${gallery.title} — ${gallery.displayDate}`;
     openBtn.href = gallery.url;
     newTabBtn.href = gallery.url;
@@ -315,11 +350,13 @@ async function openPreview(id, pushHistory = true) {
     }
 
     if (gallery.previewLoaded && gallery.cachedPage) {
+        log("Using cached preview");
         renderPreviewContent(gallery.cachedPage);
         return;
     }
 
     if (gallery.exists === false) {
+        log("Gallery marked as not existing");
         renderErrorPreview(gallery);
         return;
     }
@@ -329,7 +366,7 @@ async function openPreview(id, pushHistory = true) {
 }
 
 /* ============================================================
-   TELEGRAPH API (USING PUBLIC CORS PROXY)
+   TELEGRAPH API (DIRECT - NO PROXY)
    ============================================================ */
 
 async function loadTelegraphPreview(gallery) {
@@ -341,19 +378,21 @@ async function loadTelegraphPreview(gallery) {
         const path = pageUrl.pathname.replace(/^\/+/, "");
         const apiUrl = `https://api.telegra.ph/getPage/${encodeURIComponent(path)}?return_content=true`;
         
-        // Use public CORS proxy
-        const proxyUrl = CORS_PROXY + encodeURIComponent(apiUrl);
-        
-        const response = await fetch(proxyUrl, { 
+        log(`Fetching: ${apiUrl}`);
+
+        const response = await fetch(apiUrl, { 
             method: "GET", 
             cache: "no-store" 
         });
+
+        log(`Response status: ${response.status}`);
 
         if (!response.ok) {
             throw new Error("HTTP " + response.status);
         }
 
         const data = await response.json();
+        log(`API response: ok=${data.ok}`);
 
         if (!data.ok || !data.result) {
             throw new Error("Telegraph page not found");
@@ -364,12 +403,15 @@ async function loadTelegraphPreview(gallery) {
         gallery.cachedPage = data.result;
         gallery.previewImage = findFirstImage(data.result.content);
 
+        log(`Preview loaded successfully! Title: ${data.result.title}`);
+        log(`Preview image: ${gallery.previewImage ? 'Found' : 'Not found'}`);
+
         renderPreviewContent(data.result);
         updateCardImage(gallery);
         renderGrid();
 
     } catch (error) {
-        console.warn("Telegraph API preview failed:", error);
+        log(`ERROR: ${error.message}`, 'error');
         gallery.exists = false;
         gallery.previewLoaded = true;
         renderErrorPreview(gallery);
@@ -462,6 +504,7 @@ function renderErrorPreview(gallery) {
                 <div class="icon">⚠️</div>
                 <h3>Gallery not available</h3>
                 <p>This gallery page could not be loaded from Telegraph.</p>
+                <p style="font-size:12px;color:#888;margin-top:10px">URL: ${gallery.url}</p>
                 <div style="margin-top:20px">
                     <a href="${escapeAttribute(gallery.url)}" target="_blank" rel="noopener noreferrer" class="btn btn-newtab">
                         ↗ Open Telegraph Gallery
@@ -666,8 +709,10 @@ function loadHashGallery() {
    INITIALIZE
    ============================================================ */
 
+log("Initializing...");
 renderGrid();
 loadHashGallery();
+log("Gallery ready!");
 </script>
 
 </body>
