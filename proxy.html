@@ -45,7 +45,6 @@
                 '<div>Page exists: ' + (data.ok ? 'Yes' : 'No') + '</div>' +
                 '<div>Title: ' + (data.result ? data.result.title : 'N/A') + '</div>';
             
-            // Add CORS headers
             const headers = new Headers({
                 'Access-Control-Allow-Origin': '*',
                 'Access-Control-Allow-Methods': 'GET, OPTIONS',
@@ -53,13 +52,11 @@
                 'Content-Type': 'application/json'
             });
 
-            // Create a new response with CORS headers
             const corsResponse = new Response(JSON.stringify(data), {
                 status: 200,
                 headers: headers
             });
 
-            // For browsers that support it, respond with CORS-enabled data
             console.log('Proxy response:', data);
         })
         .catch(error => {
