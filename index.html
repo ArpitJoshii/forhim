@@ -224,7 +224,7 @@ const newTabBtn = document.getElementById("newTabBtn");
 const toast = document.getElementById("toast");
 
 /* ============================================================
-   FILTER
+   FILTER & SORT
    ============================================================ */
 
 function getFilteredGalleries() {
@@ -236,7 +236,6 @@ function getFilteredGalleries() {
 
     if (currentSearch) {
         const search = currentSearch.toLowerCase();
-
         filtered = filtered.filter(gallery =>
             gallery.title.toLowerCase().includes(search) ||
             gallery.displayDate.toLowerCase().includes(search) ||
@@ -260,11 +259,8 @@ function getFilteredGalleries() {
 
 function renderGrid() {
     const filtered = getFilteredGalleries();
-
     galleryGrid.innerHTML = "";
-
-    resultCount.textContent =
-        `${filtered.length} ${filtered.length === 1 ? "gallery" : "galleries"} found`;
+    resultCount.textContent = `${filtered.length} ${filtered.length === 1 ? "gallery" : "galleries"} found`;
 
     if (!filtered.length) {
         noResults.style.display = "block";
@@ -277,26 +273,12 @@ function renderGrid() {
         const card = document.createElement("article");
         card.className = "gallery-card";
 
-        let previewHTML = `
-            <div class="preview-placeholder">
-                <div class="icon">🔄</div>
-                <div>Loading preview...</div>
-            </div>
-        `;
+        let previewHTML = `<div class="preview-placeholder"><div class="icon">🔄</div><div>Loading...</div></div>`;
 
         if (gallery.previewImage) {
-            previewHTML = `
-                <img src="${escapeAttribute(gallery.previewImage)}"
-                     alt="Photo Gallery"
-                     loading="lazy">
-            `;
+            previewHTML = `<img src="${escapeAttribute(gallery.previewImage)}" alt="Photo Gallery" loading="lazy">`;
         } else if (gallery.exists === false) {
-            previewHTML = `
-                <div class="preview-placeholder">
-                    <div class="icon">⚠️</div>
-                    <div>Gallery not available</div>
-                </div>
-            `;
+            previewHTML = `<div class="preview-placeholder"><div class="icon">⚠️</div><div>Not available</div></div>`;
         }
 
         card.innerHTML = `
@@ -304,65 +286,26 @@ function renderGrid() {
                 <div class="date-badge">${formatShortDate(gallery.date)}</div>
                 ${previewHTML}
             </div>
-
             <div class="card-body">
                 <h3 class="card-title">Photo Gallery</h3>
-
-                <div class="card-date">
-                    📅 ${gallery.displayDate}
-                </div>
-
+                <div class="card-date">📅 ${gallery.displayDate}</div>
                 <div class="card-actions">
-
-                    <button class="btn btn-preview"
-                            data-preview-id="${gallery.id}">
-                        👁 Preview
-                    </button>
-
-                    <a class="btn btn-open"
-                       href="${escapeAttribute(gallery.url)}"
-                       target="_self">
-                        🔗 Open
-                    </a>
-
-                    <a class="btn btn-newtab"
-                       href="${escapeAttribute(gallery.url)}"
-                       target="_blank"
-                       rel="noopener noreferrer">
-                        ↗ New Tab
-                    </a>
-
-                    <button class="btn btn-copy"
-                            data-copy-url="${escapeAttribute(gallery.url)}">
-                        📋 Copy Link
-                    </button>
-
+                    <button class="btn btn-preview" data-preview-id="${gallery.id}">👁 Preview</button>
+                    <a class="btn btn-open" href="${escapeAttribute(gallery.url)}" target="_self">🔗 Open</a>
+                    <a class="btn btn-newtab" href="${escapeAttribute(gallery.url)}" target="_blank" rel="noopener noreferrer">↗ New Tab</a>
+                    <button class="btn btn-copy" data-copy-url="${escapeAttribute(gallery.url)}">📋 Copy Link</button>
                 </div>
             </div>
         `;
 
-        card.querySelector("[data-preview-id]").addEventListener("click", () => {
-            openPreview(gallery.id);
-        });
-
-        card.querySelector("[data-copy-url]").addEventListener("click", () => {
-            copyGalleryLink(gallery.url);
-        });
-
+        card.querySelector("[data-preview-id]").addEventListener("click", () => openPreview(gallery.id));
+        card.querySelector("[data-copy-url]").addEventListener("click", () => copyGalleryLink(gallery.url));
         galleryGrid.appendChild(card);
     });
 }
 
-/* ============================================================
-   ESCAPE
-   ============================================================ */
-
 function escapeAttribute(value) {
-    return String(value)
-        .replace(/&/g, "&amp;")
-        .replace(/"/g, "&quot;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
+    return String(value).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 /* ============================================================
@@ -371,30 +314,21 @@ function escapeAttribute(value) {
 
 async function openPreview(id, pushHistory = true) {
     const index = galleries.findIndex(gallery => gallery.id === id);
-
     if (index === -1) return;
 
     currentGalleryIndex = index;
-
     const gallery = galleries[index];
 
-    modalTitle.textContent =
-        `${gallery.title} — ${gallery.displayDate}`;
-
+    modalTitle.textContent = `${gallery.title} — ${gallery.displayDate}`;
     openBtn.href = gallery.url;
     newTabBtn.href = gallery.url;
 
     previewModal.classList.add("show");
     document.body.style.overflow = "hidden";
-
     updateNavigation();
 
     if (pushHistory) {
-        history.pushState(
-            { galleryId: id },
-            "",
-            "#gallery-" + id
-        );
+        history.pushState({ galleryId: id }, "", "#gallery-" + id);
     }
 
     if (gallery.previewLoaded && gallery.cachedPage) {
@@ -402,38 +336,29 @@ async function openPreview(id, pushHistory = true) {
         return;
     }
 
-    modalContent.innerHTML = `
-        <div class="loading">
-            <div class="spinner"></div>
-            <div>Loading Telegraph preview...</div>
-        </div>
-    `;
+    if (gallery.exists === false) {
+        renderErrorPreview(gallery);
+        return;
+    }
 
+    modalContent.innerHTML = `<div class="loading"><div class="spinner"></div><div>Loading Telegraph preview...</div></div>`;
     await loadTelegraphPreview(gallery);
 }
 
 /* ============================================================
-   TELEGRAPH API PREVIEW
+   TELEGRAPH API PREVIEW (NO IFRAME)
    ============================================================ */
 
 async function loadTelegraphPreview(gallery) {
     if (gallery.loading) return;
-
     gallery.loading = true;
 
     try {
         const pageUrl = new URL(gallery.url);
         const path = pageUrl.pathname.replace(/^\/+/, "");
+        const apiUrl = "https://api.telegra.ph/getPage/" + encodeURIComponent(path) + "?return_content=true";
 
-        const apiUrl =
-            "https://api.telegra.ph/getPage/" +
-            encodeURIComponent(path) +
-            "?return_content=true";
-
-        const response = await fetch(apiUrl, {
-            method: "GET",
-            cache: "no-store"
-        });
+        const response = await fetch(apiUrl, { method: "GET", cache: "no-store" });
 
         if (!response.ok) {
             throw new Error("HTTP " + response.status);
@@ -458,7 +383,6 @@ async function loadTelegraphPreview(gallery) {
         console.warn("Telegraph API preview failed:", error);
         gallery.exists = false;
         gallery.previewLoaded = true;
-
         renderErrorPreview(gallery);
         renderGrid();
     } finally {
@@ -472,25 +396,16 @@ async function loadTelegraphPreview(gallery) {
 
 function findFirstImage(nodes) {
     if (!Array.isArray(nodes)) return null;
-
     for (const node of nodes) {
         if (!node) continue;
-
-        if (
-            node.tag === "img" &&
-            node.attrs &&
-            node.attrs.src
-        ) {
+        if (node.tag === "img" && node.attrs && node.attrs.src) {
             return node.attrs.src;
         }
-
         if (node.children) {
             const result = findFirstImage(node.children);
-
             if (result) return result;
         }
     }
-
     return null;
 }
 
@@ -502,46 +417,32 @@ function updateCardImage(gallery) {
     if (!gallery.previewImage) return;
 
     const cards = document.querySelectorAll(".gallery-card");
-
     cards.forEach(card => {
-        const button =
-            card.querySelector("[data-preview-id]");
+        const button = card.querySelector("[data-preview-id]");
+        if (!button || Number(button.dataset.previewId) !== gallery.id) return;
 
-        if (!button) return;
-
-        if (Number(button.dataset.previewId) !== gallery.id) {
-            return;
-        }
-
-        const preview =
-            card.querySelector(".preview-image");
-
+        const preview = card.querySelector(".preview-image");
         if (!preview) return;
 
-        const old =
-            preview.querySelector(".preview-placeholder");
-
+        const old = preview.querySelector(".preview-placeholder");
         if (old) old.remove();
 
         if (!preview.querySelector("img")) {
             const img = document.createElement("img");
-
             img.src = gallery.previewImage;
             img.alt = "Photo Gallery";
             img.loading = "lazy";
-
             preview.appendChild(img);
         }
     });
 }
 
 /* ============================================================
-   RENDER TELEGRAPH CONTENT SAFELY
+   RENDER PREVIEW CONTENT
    ============================================================ */
 
 function renderPreviewContent(page) {
     modalContent.innerHTML = "";
-
     const wrapper = document.createElement("div");
     wrapper.className = "preview-content";
 
@@ -551,16 +452,10 @@ function renderPreviewContent(page) {
         wrapper.appendChild(title);
     }
 
-    if (
-        Array.isArray(page.content) &&
-        page.content.length
-    ) {
+    if (Array.isArray(page.content) && page.content.length) {
         page.content.forEach(node => {
             const element = telegraphNodeToElement(node);
-
-            if (element) {
-                wrapper.appendChild(element);
-            }
+            if (element) wrapper.appendChild(element);
         });
     } else {
         const message = document.createElement("p");
@@ -583,11 +478,7 @@ function renderErrorPreview(gallery) {
                 <h3>Gallery not available</h3>
                 <p>This gallery page could not be loaded from Telegraph.</p>
                 <div style="margin-top:20px">
-                    <a
-                        href="${escapeAttribute(gallery.url)}"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="btn btn-newtab">
+                    <a href="${escapeAttribute(gallery.url)}" target="_blank" rel="noopener noreferrer" class="btn btn-newtab">
                         ↗ Open Telegraph Gallery
                     </a>
                 </div>
@@ -608,19 +499,10 @@ function telegraphNodeToElement(node) {
         return span;
     }
 
-    if (!node || !node.tag) {
-        return null;
-    }
+    if (!node || !node.tag) return null;
 
-    const allowedTags = [
-        "p", "h3", "h4", "blockquote", "figure",
-        "figcaption", "img", "a", "strong", "em",
-        "br", "ul", "ol", "li", "code", "pre"
-    ];
-
-    if (!allowedTags.includes(node.tag)) {
-        return null;
-    }
+    const allowedTags = ["p", "h3", "h4", "blockquote", "figure", "figcaption", "img", "a", "strong", "em", "br", "ul", "ol", "li", "code", "pre"];
+    if (!allowedTags.includes(node.tag)) return null;
 
     const element = document.createElement(node.tag);
 
@@ -630,7 +512,6 @@ function telegraphNodeToElement(node) {
             element.loading = "lazy";
             element.alt = "";
         }
-
         if (node.tag === "a" && node.attrs.href) {
             element.href = node.attrs.href;
             element.target = "_blank";
@@ -641,9 +522,7 @@ function telegraphNodeToElement(node) {
     if (Array.isArray(node.children)) {
         node.children.forEach(child => {
             const childElement = telegraphNodeToElement(child);
-            if (childElement) {
-                element.appendChild(childElement);
-            }
+            if (childElement) element.appendChild(childElement);
         });
     }
 
@@ -688,13 +567,8 @@ function goLast() {
 function closePreview(removeHistory = true) {
     previewModal.classList.remove("show");
     document.body.style.overflow = "";
-
     if (removeHistory && location.hash) {
-        history.pushState(
-            {},
-            "",
-            window.location.pathname + window.location.search
-        );
+        history.pushState({}, "", window.location.pathname + window.location.search);
     }
 }
 
@@ -734,7 +608,7 @@ function showToast(message) {
 }
 
 /* ============================================================
-   SEARCH
+   EVENT LISTENERS
    ============================================================ */
 
 searchInput.addEventListener("input", function () {
@@ -742,33 +616,19 @@ searchInput.addEventListener("input", function () {
     renderGrid();
 });
 
-/* ============================================================
-   MONTH FILTER
-   ============================================================ */
-
 document.querySelectorAll(".filter-btn").forEach(button => {
     button.addEventListener("click", function () {
-        document.querySelectorAll(".filter-btn").forEach(btn => {
-            btn.classList.remove("active");
-        });
+        document.querySelectorAll(".filter-btn").forEach(btn => btn.classList.remove("active"));
         this.classList.add("active");
         currentMonth = this.dataset.month;
         renderGrid();
     });
 });
 
-/* ============================================================
-   SORT
-   ============================================================ */
-
 sortSelect.addEventListener("change", function () {
     currentSort = this.value;
     renderGrid();
 });
-
-/* ============================================================
-   MODAL BUTTONS
-   ============================================================ */
 
 closeModal.addEventListener("click", () => closePreview());
 prevBtn.addEventListener("click", goPrevious);
@@ -782,46 +642,22 @@ copyBtn.addEventListener("click", function () {
     }
 });
 
-/* ============================================================
-   CLICK OUTSIDE
-   ============================================================ */
-
 previewModal.addEventListener("click", function (event) {
-    if (event.target === previewModal) {
-        closePreview();
-    }
+    if (event.target === previewModal) closePreview();
 });
 
-/* ============================================================
-   KEYBOARD
-   ============================================================ */
-
 document.addEventListener("keydown", function (event) {
-    if (!previewModal.classList.contains("show")) {
-        return;
-    }
-
+    if (!previewModal.classList.contains("show")) return;
     if (event.key === "Escape") {
         closePreview();
         return;
     }
-
-    if (event.key === "ArrowLeft") {
-        goPrevious();
-    }
-
-    if (event.key === "ArrowRight") {
-        goNext();
-    }
+    if (event.key === "ArrowLeft") goPrevious();
+    if (event.key === "ArrowRight") goNext();
 });
-
-/* ============================================================
-   BROWSER BACK / FORWARD
-   ============================================================ */
 
 window.addEventListener("popstate", function () {
     const hash = window.location.hash;
-
     if (hash.startsWith("#gallery-")) {
         const id = Number(hash.replace("#gallery-", ""));
         if (galleries.some(gallery => gallery.id === id)) {
@@ -832,45 +668,32 @@ window.addEventListener("popstate", function () {
     }
 });
 
-/* ============================================================
-   INITIAL HASH
-   ============================================================ */
-
 function loadHashGallery() {
     const hash = window.location.hash;
-
-    if (!hash.startsWith("#gallery-")) {
-        return;
-    }
-
+    if (!hash.startsWith("#gallery-")) return;
     const id = Number(hash.replace("#gallery-", ""));
-
     if (galleries.some(gallery => gallery.id === id)) {
         openPreview(id, false);
     }
 }
 
 /* ============================================================
-   PREFETCH PREVIEWS (FIXED - loads on page load)
+   PREFETCH PREVIEWS (AUTO-LOAD ON PAGE LOAD)
    ============================================================ */
 
 async function prefetchPreviews() {
     const list = [...galleries]
         .sort((a, b) => b.date.localeCompare(a.date))
-        .slice(0, 10);
+        .slice(0, 12);
 
     for (const gallery of list) {
-        if (gallery.previewLoaded || gallery.loading) {
-            continue;
-        }
-
+        if (gallery.previewLoaded || gallery.loading) continue;
         try {
             await loadTelegraphPreview(gallery);
         } catch (error) {
             console.warn(error);
         }
-
-        await new Promise(resolve => setTimeout(resolve, 150));
+        await new Promise(resolve => setTimeout(resolve, 100));
     }
 }
 
