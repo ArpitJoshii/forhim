@@ -1,215 +1,2131 @@
-export default {
-    async fetch(request, env, ctx) {
+<!DOCTYPE html>
+<html lang="en">
 
-        const url = new URL(request.url);
+<head>
 
-        const cors = {
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type",
-            "Access-Control-Max-Age": "86400"
-        };
+<meta charset="UTF-8">
 
-        // ------------------------------------------------------
-        // CORS preflight
-        // ------------------------------------------------------
+<meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+>
 
-        if (request.method === "OPTIONS") {
-            return new Response(null, {
-                status: 204,
-                headers: cors
-            });
-        }
+<title>
+    Photo Gallery
+</title>
 
-        if (request.method !== "GET") {
-            return json({
-                ok: false,
-                error: "GET requests only"
-            }, 405, cors);
-        }
+<style>
 
-        // ------------------------------------------------------
-        // Page
-        // ------------------------------------------------------
+* {
+    box-sizing: border-box;
+}
 
-        const page = url.searchParams.get("page");
+html,
+body {
+    margin: 0;
+    padding: 0;
+    font-family:
+        Inter,
+        Arial,
+        sans-serif;
+    background: #f4f6f9;
+    color: #1f2937;
+}
 
-        if (!page) {
-            return json({
-                ok: false,
-                error: "Missing page parameter"
-            }, 400, cors);
-        }
+/* =========================================================
+   HEADER
+========================================================= */
 
-        // ------------------------------------------------------
-        // Security
-        // ------------------------------------------------------
+.header {
 
-        if (!/^[a-zA-Z0-9_-]+$/.test(page)) {
-            return json({
-                ok: false,
-                error: "Invalid Telegraph page"
-            }, 400, cors);
-        }
+    background:
+        linear-gradient(
+            135deg,
+            #667eea,
+            #764ba2
+        );
 
-        // ------------------------------------------------------
-        // Telegraph API
-        // ------------------------------------------------------
+    color: white;
 
-        const apiURL =
-            "https://api.telegra.ph/getPage/" +
-            encodeURIComponent(page) +
-            "?return_content=true";
+    padding: 28px 20px;
 
-        try {
+    text-align: center;
 
-            /*
-             * Cache the Telegraph response.
-             *
-             * This means repeatedly opening the same gallery
-             * doesn't necessarily require another Telegraph
-             * request every time.
-             */
+    box-shadow:
+        0 4px 18px
+        rgba(0,0,0,.15);
 
-            const cacheKey =
-                new Request(
-                    "https://gallery-cache/" + page
-                );
+}
 
-            const cache =
-                caches.default;
+.header h1 {
 
-            let response =
-                await cache.match(cacheKey);
+    margin: 0;
 
-            if (response) {
+    font-size: 30px;
 
-                return new Response(
-                    response.body,
-                    {
-                        status: response.status,
-                        headers: {
-                            ...Object.fromEntries(
-                                response.headers
-                            ),
-                            ...cors
-                        }
-                    }
-                );
+}
 
-            }
+.header p {
 
-            // --------------------------------------------------
-            // Fetch Telegraph
-            // --------------------------------------------------
+    margin:
+        8px 0 0;
 
-            const telegraphResponse =
-                await fetch(apiURL, {
-                    headers: {
-                        "Accept":
-                            "application/json"
-                    }
-                });
+    opacity: .9;
 
-            if (!telegraphResponse.ok) {
+}
 
-                return json({
-                    ok: false,
-                    error:
-                        "Telegraph API error",
-                    status:
-                        telegraphResponse.status,
-                    page
-                }, 502, cors);
 
-            }
+/* =========================================================
+   MAIN
+========================================================= */
 
-            const data =
-                await telegraphResponse.json();
+.container {
 
-            if (!data.ok) {
+    width: min(
+        1200px,
+        calc(100% - 30px)
+    );
 
-                return json({
-                    ok: false,
-                    error:
-                        data.error ||
-                        "Telegraph page not found",
-                    page
-                }, 404, cors);
+    margin:
+        25px auto;
 
-            }
+}
 
-            // --------------------------------------------------
-            // Cache successful response
-            // --------------------------------------------------
 
-            const output =
-                new Response(
-                    JSON.stringify(data),
-                    {
-                        status: 200,
-                        headers: {
-                            "Content-Type":
-                                "application/json; charset=UTF-8",
-                            "Cache-Control":
-                                "public, max-age=1800"
-                        }
-                    }
-                );
+/* =========================================================
+   MONTHS
+========================================================= */
 
-            ctx.waitUntil(
-                cache.put(
-                    cacheKey,
-                    output.clone()
-                )
-            );
+.months {
 
-            return new Response(
-                output.body,
-                {
-                    status: 200,
-                    headers: {
-                        "Content-Type":
-                            "application/json; charset=UTF-8",
-                        "Cache-Control":
-                            "public, max-age=1800",
-                        ...cors
-                    }
-                }
-            );
+    display: flex;
 
-        }
-        catch (error) {
+    flex-wrap: wrap;
 
-            return json({
-                ok: false,
-                error:
-                    "Unable to contact Telegraph",
-                details:
-                    error.message
-            }, 500, cors);
+    justify-content: center;
 
-        }
+    gap: 10px;
+
+    margin-bottom: 25px;
+
+}
+
+.month-btn {
+
+    border: 0;
+
+    background: white;
+
+    padding:
+        11px 18px;
+
+    border-radius: 8px;
+
+    cursor: pointer;
+
+    font-weight: 600;
+
+    color: #4b5563;
+
+    box-shadow:
+        0 2px 8px
+        rgba(0,0,0,.08);
+
+    transition: .2s;
+
+}
+
+.month-btn:hover {
+
+    transform:
+        translateY(-2px);
+
+}
+
+.month-btn.active {
+
+    background: #667eea;
+
+    color: white;
+
+}
+
+
+/* =========================================================
+   TITLE
+========================================================= */
+
+.gallery-heading {
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    margin-bottom: 18px;
+
+}
+
+.gallery-heading h2 {
+
+    margin: 0;
+
+}
+
+
+/* =========================================================
+   DAY GRID
+========================================================= */
+
+.days {
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            auto-fill,
+            minmax(190px, 1fr)
+        );
+
+    gap: 16px;
+
+}
+
+
+.day-card {
+
+    background: white;
+
+    border-radius: 12px;
+
+    overflow: hidden;
+
+    cursor: pointer;
+
+    box-shadow:
+        0 3px 12px
+        rgba(0,0,0,.08);
+
+    transition:
+        transform .2s,
+        box-shadow .2s;
+
+}
+
+.day-card:hover {
+
+    transform:
+        translateY(-4px);
+
+    box-shadow:
+        0 8px 25px
+        rgba(0,0,0,.14);
+
+}
+
+
+.day-preview {
+
+    height: 150px;
+
+    background:
+        linear-gradient(
+            135deg,
+            #e5e7eb,
+            #f9fafb
+        );
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    overflow: hidden;
+
+}
+
+.day-preview img {
+
+    width: 100%;
+
+    height: 100%;
+
+    object-fit: cover;
+
+}
+
+
+.day-info {
+
+    padding: 13px;
+
+}
+
+.day-info strong {
+
+    display: block;
+
+    margin-bottom: 5px;
+
+}
+
+.day-info span {
+
+    color: #6b7280;
+
+    font-size: 13px;
+
+}
+
+
+/* =========================================================
+   LOADING
+========================================================= */
+
+.loading {
+
+    padding: 60px 20px;
+
+    text-align: center;
+
+    color: #6b7280;
+
+}
+
+.spinner {
+
+    width: 42px;
+
+    height: 42px;
+
+    border:
+        4px solid
+        #e5e7eb;
+
+    border-top-color:
+        #667eea;
+
+    border-radius: 50%;
+
+    animation:
+        spin .8s linear infinite;
+
+    margin:
+        0 auto 15px;
+
+}
+
+@keyframes spin {
+
+    to {
+        transform:
+            rotate(360deg);
     }
-};
+
+}
+
+
+/* =========================================================
+   EMPTY
+========================================================= */
+
+.empty {
+
+    padding: 60px 20px;
+
+    text-align: center;
+
+    color: #6b7280;
+
+}
+
+
+/* =========================================================
+   VIEWER
+========================================================= */
+
+.viewer {
+
+    position: fixed;
+
+    inset: 0;
+
+    z-index: 5000;
+
+    background:
+        rgba(10,10,15,.96);
+
+    display: none;
+
+    flex-direction: column;
+
+}
+
+.viewer.open {
+
+    display: flex;
+
+}
+
+
+/* =========================================================
+   VIEWER HEADER
+========================================================= */
+
+.viewer-top {
+
+    height: 64px;
+
+    flex-shrink: 0;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    padding:
+        0 20px;
+
+    color: white;
+
+    border-bottom:
+        1px solid
+        rgba(255,255,255,.12);
+
+}
+
+.viewer-title {
+
+    font-weight: 600;
+
+}
+
+.close-btn {
+
+    border: 0;
+
+    background:
+        rgba(255,255,255,.12);
+
+    color: white;
+
+    width: 38px;
+
+    height: 38px;
+
+    border-radius: 50%;
+
+    font-size: 24px;
+
+    cursor: pointer;
+
+}
+
+
+/* =========================================================
+   NAVIGATION
+========================================================= */
+
+.viewer-nav {
+
+    position: absolute;
+
+    left: 0;
+
+    right: 0;
+
+    top: 64px;
+
+    bottom: 0;
+
+    pointer-events: none;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    padding:
+        0 15px;
+
+}
+
+.nav-btn {
+
+    pointer-events: auto;
+
+    border: 0;
+
+    width: 48px;
+
+    height: 48px;
+
+    border-radius: 50%;
+
+    background:
+        rgba(255,255,255,.15);
+
+    color: white;
+
+    font-size: 28px;
+
+    cursor: pointer;
+
+    transition: .2s;
+
+    z-index: 10;
+
+}
+
+.nav-btn:hover {
+
+    background:
+        rgba(255,255,255,.28);
+
+}
+
+.nav-btn:disabled {
+
+    opacity: .25;
+
+    cursor: not-allowed;
+
+}
+
+
+/* =========================================================
+   VIEWER CONTENT
+========================================================= */
+
+.viewer-body {
+
+    flex: 1;
+
+    overflow-y: auto;
+
+    padding:
+        35px 90px 50px;
+
+    scroll-behavior: smooth;
+
+}
+
+.viewer-inner {
+
+    width: min(
+        1000px,
+        100%
+    );
+
+    margin: auto;
+
+    color: white;
+
+}
+
+
+/* =========================================================
+   TELEGRAPH CONTENT
+========================================================= */
+
+.telegraph-text {
+
+    line-height: 1.7;
+
+    font-size: 17px;
+
+}
+
+.telegraph-text h1,
+.telegraph-text h2,
+.telegraph-text h3 {
+
+    color: white;
+
+}
+
+.telegraph-text a {
+
+    color: #93c5fd;
+
+}
+
+.telegraph-image {
+
+    width: 100%;
+
+    max-height: 750px;
+
+    object-fit: contain;
+
+    display: block;
+
+    margin:
+        20px auto;
+
+    border-radius: 8px;
+
+    cursor: zoom-in;
+
+}
+
+
+/* =========================================================
+   VIEWER FOOTER
+========================================================= */
+
+.viewer-footer {
+
+    height: 52px;
+
+    flex-shrink: 0;
+
+    display: flex;
+
+    justify-content: center;
+
+    align-items: center;
+
+    color: rgba(255,255,255,.8);
+
+    border-top:
+        1px solid
+        rgba(255,255,255,.12);
+
+}
+
+
+/* =========================================================
+   LIGHTBOX
+========================================================= */
+
+.lightbox {
+
+    position: fixed;
+
+    inset: 0;
+
+    background:
+        rgba(0,0,0,.97);
+
+    z-index: 9000;
+
+    display: none;
+
+    align-items: center;
+
+    justify-content: center;
+
+    padding: 25px;
+
+}
+
+.lightbox.open {
+
+    display: flex;
+
+}
+
+.lightbox img {
+
+    max-width: 96vw;
+
+    max-height: 92vh;
+
+    object-fit: contain;
+
+}
+
+.lightbox-close {
+
+    position: absolute;
+
+    top: 15px;
+
+    right: 20px;
+
+    border: 0;
+
+    background: none;
+
+    color: white;
+
+    font-size: 40px;
+
+    cursor: pointer;
+
+}
+
+
+/* =========================================================
+   MOBILE
+========================================================= */
+
+@media(max-width:700px) {
+
+    .header h1 {
+        font-size: 24px;
+    }
+
+    .days {
+        grid-template-columns:
+            repeat(2, 1fr);
+        gap: 10px;
+    }
+
+    .day-preview {
+        height: 110px;
+    }
+
+    .viewer-body {
+        padding:
+            25px 55px 40px;
+    }
+
+    .nav-btn {
+        width: 42px;
+        height: 42px;
+        font-size: 22px;
+    }
+
+}
+
+</style>
+
+</head>
+
+
+<body>
+
+
+<!-- =======================================================
+     HEADER
+======================================================= -->
+
+<header class="header">
+
+    <h1>
+        📸 Photo Gallery
+    </h1>
+
+    <p>
+        November 2024 — February 2025
+    </p>
+
+</header>
+
+
+<main class="container">
+
+
+    <!-- MONTHS -->
+
+    <div
+        class="months"
+        id="months"
+    ></div>
+
+
+    <!-- HEADING -->
+
+    <div class="gallery-heading">
+
+        <h2 id="monthTitle">
+            November 2024
+        </h2>
+
+        <span id="status"></span>
+
+    </div>
+
+
+    <!-- DAYS -->
+
+    <div id="days">
+
+        <div class="loading">
+
+            <div class="spinner"></div>
+
+            Loading galleries...
+
+        </div>
+
+    </div>
+
+
+</main>
+
+
+<!-- =======================================================
+     SAME-PAGE VIEWER
+======================================================= -->
+
+<section
+    class="viewer"
+    id="viewer"
+>
+
+
+    <!-- TOP -->
+
+    <div class="viewer-top">
+
+        <div
+            class="viewer-title"
+            id="viewerTitle"
+        >
+            Gallery
+        </div>
+
+
+        <button
+            class="close-btn"
+            onclick="closeViewer()"
+            aria-label="Close"
+        >
+            ×
+        </button>
+
+    </div>
+
+
+    <!-- CONTENT -->
+
+    <div
+        class="viewer-body"
+        id="viewerBody"
+    >
+
+        <div
+            class="viewer-inner"
+            id="viewerContent"
+        ></div>
+
+    </div>
+
+
+    <!-- PREVIOUS / NEXT -->
+
+    <div class="viewer-nav">
+
+        <button
+            class="nav-btn"
+            id="previousBtn"
+            onclick="previousGallery()"
+            title="Previous"
+        >
+            ‹
+        </button>
+
+
+        <button
+            class="nav-btn"
+            id="nextBtn"
+            onclick="nextGallery()"
+            title="Next"
+        >
+            ›
+        </button>
+
+    </div>
+
+
+    <!-- FOOTER -->
+
+    <div
+        class="viewer-footer"
+        id="viewerCounter"
+    >
+        1 / 1
+    </div>
+
+</section>
+
+
+<!-- =======================================================
+     LIGHTBOX
+======================================================= -->
+
+<div
+    class="lightbox"
+    id="lightbox"
+    onclick="closeLightbox()"
+>
+
+    <button
+        class="lightbox-close"
+        onclick="closeLightbox()"
+    >
+        ×
+    </button>
+
+
+    <img
+        id="lightboxImage"
+        alt="Full size image"
+        onclick="event.stopPropagation()"
+    >
+
+</div>
+
+
+<script>
 
 
 // ============================================================
-// JSON HELPER
+// YOUR CLOUDFLARE WORKER
 // ============================================================
 
-function json(data, status, cors) {
+const WORKER_URL =
+    "https://YOUR-WORKER.workers.dev";
 
-    return new Response(
-        JSON.stringify(data),
-        {
-            status,
-            headers: {
-                "Content-Type":
-                    "application/json; charset=UTF-8",
-                ...cors
-            }
+
+// ============================================================
+// TELEGRAPH PREFIX
+// ============================================================
+//
+// Your URLs:
+//
+// https://telegra.ph/gallary-11-01
+// https://telegra.ph/gallary-11-02
+//
+// Therefore:
+//
+// gallary-
+//
+// ============================================================
+
+const GALLERY_PREFIX =
+    "gallary-";
+
+
+// ============================================================
+// MONTHS
+// ============================================================
+
+const MONTHS = [
+
+    {
+        name: "November 2024",
+        year: 2024,
+        month: 11
+    },
+
+    {
+        name: "December 2024",
+        year: 2024,
+        month: 12
+    },
+
+    {
+        name: "January 2025",
+        year: 2025,
+        month: 1
+    },
+
+    {
+        name: "February 2025",
+        year: 2025,
+        month: 2
+    }
+
+];
+
+
+// ============================================================
+// STATE
+// ============================================================
+
+let currentMonth = 0;
+
+let galleries = [];
+
+let currentIndex = -1;
+
+let touchStartX = 0;
+
+
+// ============================================================
+// DOM
+// ============================================================
+
+const monthsElement =
+    document.getElementById("months");
+
+const daysElement =
+    document.getElementById("days");
+
+const monthTitle =
+    document.getElementById("monthTitle");
+
+const statusElement =
+    document.getElementById("status");
+
+const viewer =
+    document.getElementById("viewer");
+
+const viewerTitle =
+    document.getElementById("viewerTitle");
+
+const viewerBody =
+    document.getElementById("viewerBody");
+
+const viewerContent =
+    document.getElementById("viewerContent");
+
+const viewerCounter =
+    document.getElementById("viewerCounter");
+
+const previousBtn =
+    document.getElementById("previousBtn");
+
+const nextBtn =
+    document.getElementById("nextBtn");
+
+
+// ============================================================
+// MONTH BUTTONS
+// ============================================================
+
+function buildMonthButtons() {
+
+    monthsElement.innerHTML = "";
+
+    MONTHS.forEach(
+        (month, index) => {
+
+            const button =
+                document.createElement("button");
+
+            button.className =
+                "month-btn";
+
+            button.textContent =
+                month.name;
+
+            button.onclick =
+                () => {
+
+                    currentMonth =
+                        index;
+
+                    setActiveMonth();
+
+                    loadMonth(month);
+
+                };
+
+            monthsElement.appendChild(
+                button
+            );
+
         }
     );
 
 }
+
+
+// ============================================================
+// ACTIVE MONTH
+// ============================================================
+
+function setActiveMonth() {
+
+    document
+        .querySelectorAll(".month-btn")
+        .forEach(
+            (button, index) => {
+
+                button.classList.toggle(
+                    "active",
+                    index === currentMonth
+                );
+
+            }
+        );
+
+}
+
+
+// ============================================================
+// DAYS IN MONTH
+// ============================================================
+
+function daysInMonth(
+    year,
+    month
+) {
+
+    return new Date(
+        year,
+        month,
+        0
+    ).getDate();
+
+}
+
+
+// ============================================================
+// PAGE NAME
+// ============================================================
+
+function pageName(
+    month,
+    day
+) {
+
+    return (
+        GALLERY_PREFIX +
+
+        String(month.month)
+            .padStart(2, "0") +
+
+        "-" +
+
+        String(day)
+            .padStart(2, "0")
+    );
+
+}
+
+
+// ============================================================
+// LOAD MONTH
+// ============================================================
+
+async function loadMonth(month) {
+
+    monthTitle.textContent =
+        month.name;
+
+    daysElement.innerHTML = `
+        <div class="loading">
+
+            <div class="spinner"></div>
+
+            Checking ${month.name}...
+
+        </div>
+    `;
+
+    statusElement.textContent =
+        "";
+
+    galleries = [];
+
+
+    const total =
+        daysInMonth(
+            month.year,
+            month.month
+        );
+
+
+    /*
+     * IMPORTANT:
+     *
+     * We don't open 30 tabs.
+     *
+     * We make requests in parallel.
+     *
+     * The browser still stays on your
+     * gallery page.
+     */
+
+    const requests = [];
+
+
+    for (
+        let day = 1;
+        day <= total;
+        day++
+    ) {
+
+        requests.push(
+            checkDay(
+                month,
+                day
+            )
+        );
+
+    }
+
+
+    const results =
+        await Promise.all(
+            requests
+        );
+
+
+    galleries =
+        results
+            .filter(Boolean)
+            .sort(
+                (a, b) =>
+                    a.day - b.day
+            );
+
+
+    renderMonth(
+        month
+    );
+
+
+    statusElement.textContent =
+        `${galleries.length} galleries`;
+
+}
+
+
+// ============================================================
+// CHECK DAY
+// ============================================================
+
+async function checkDay(
+    month,
+    day
+) {
+
+    const page =
+        pageName(
+            month,
+            day
+        );
+
+
+    try {
+
+        const response =
+            await fetch(
+                WORKER_URL +
+                "?page=" +
+                encodeURIComponent(page)
+            );
+
+
+        if (!response.ok) {
+            return null;
+        }
+
+
+        const data =
+            await response.json();
+
+
+        if (
+            !data.ok ||
+            !data.result
+        ) {
+
+            return null;
+
+        }
+
+
+        const images =
+            extractImages(
+                data.result.content
+            );
+
+
+        return {
+
+            day,
+
+            page,
+
+            title:
+                data.result.title ||
+                formatDate(
+                    month,
+                    day
+                ),
+
+            content:
+                data.result.content ||
+                [],
+
+            images
+
+        };
+
+    }
+    catch {
+
+        return null;
+
+    }
+
+}
+
+
+// ============================================================
+// EXTRACT IMAGES
+// ============================================================
+
+function extractImages(
+    nodes
+) {
+
+    const result = [];
+
+
+    function walk(items) {
+
+        if (!Array.isArray(items)) {
+            return;
+        }
+
+
+        for (const node of items) {
+
+            if (
+                node.tag === "img" &&
+                node.attrs &&
+                node.attrs.src
+            ) {
+
+                result.push(
+                    node.attrs.src
+                );
+
+            }
+
+
+            if (node.children) {
+
+                walk(
+                    node.children
+                );
+
+            }
+
+        }
+
+    }
+
+
+    walk(nodes);
+
+
+    return result;
+
+}
+
+
+// ============================================================
+// RENDER MONTH
+// ============================================================
+
+function renderMonth(month) {
+
+    if (
+        galleries.length === 0
+    ) {
+
+        daysElement.innerHTML = `
+            <div class="empty">
+                No galleries found for
+                ${month.name}.
+            </div>
+        `;
+
+        return;
+
+    }
+
+
+    daysElement.innerHTML = "";
+
+
+    const grid =
+        document.createElement(
+            "div"
+        );
+
+    grid.className =
+        "days";
+
+
+    galleries.forEach(
+        (gallery, index) => {
+
+            const card =
+                document.createElement(
+                    "div"
+                );
+
+            card.className =
+                "day-card";
+
+
+            const preview =
+                document.createElement(
+                    "div"
+                );
+
+            preview.className =
+                "day-preview";
+
+
+            if (
+                gallery.images.length
+            ) {
+
+                const image =
+                    document.createElement(
+                        "img"
+                    );
+
+                image.src =
+                    gallery.images[0];
+
+                image.loading =
+                    "lazy";
+
+                preview.appendChild(
+                    image
+                );
+
+            }
+            else {
+
+                preview.textContent =
+                    "No preview";
+
+            }
+
+
+            const info =
+                document.createElement(
+                    "div"
+                );
+
+            info.className =
+                "day-info";
+
+
+            const strong =
+                document.createElement(
+                    "strong"
+                );
+
+            strong.textContent =
+                formatDate(
+                    month,
+                    gallery.day
+                );
+
+
+            const count =
+                document.createElement(
+                    "span"
+                );
+
+            count.textContent =
+                gallery.images.length +
+                " images";
+
+
+            info.appendChild(
+                strong
+            );
+
+            info.appendChild(
+                count
+            );
+
+
+            card.appendChild(
+                preview
+            );
+
+            card.appendChild(
+                info
+            );
+
+
+            card.onclick =
+                () => {
+
+                    openGallery(
+                        index
+                    );
+
+                };
+
+
+            grid.appendChild(
+                card
+            );
+
+        }
+    );
+
+
+    daysElement.appendChild(
+        grid
+    );
+
+}
+
+
+// ============================================================
+// FORMAT DATE
+// ============================================================
+
+function formatDate(
+    month,
+    day
+) {
+
+    const date =
+        new Date(
+            month.year,
+            month.month - 1,
+            day
+        );
+
+
+    return date.toLocaleDateString(
+        "en-IN",
+        {
+            day: "numeric",
+            month: "short",
+            year: "numeric"
+        }
+    );
+
+}
+
+
+// ============================================================
+// OPEN GALLERY
+// ============================================================
+
+function openGallery(
+    index
+) {
+
+    if (
+        index < 0 ||
+        index >= galleries.length
+    ) {
+
+        return;
+
+    }
+
+
+    currentIndex =
+        index;
+
+
+    renderViewer();
+
+
+    viewer.classList.add(
+        "open"
+    );
+
+
+    document.body.style.overflow =
+        "hidden";
+
+
+    /*
+     * Start viewer at top.
+     */
+
+    viewerBody.scrollTop = 0;
+
+
+    updateURL();
+
+}
+
+
+// ============================================================
+// RENDER VIEWER
+// ============================================================
+
+function renderViewer() {
+
+    const gallery =
+        galleries[currentIndex];
+
+
+    if (!gallery) {
+        return;
+    }
+
+
+    const month =
+        MONTHS[currentMonth];
+
+
+    viewerTitle.textContent =
+        formatDate(
+            month,
+            gallery.day
+        );
+
+
+    viewerCounter.textContent =
+        `${currentIndex + 1} / ${galleries.length}`;
+
+
+    previousBtn.disabled =
+        currentIndex <= 0;
+
+
+    nextBtn.disabled =
+        currentIndex >=
+        galleries.length - 1;
+
+
+    viewerContent.innerHTML =
+        "";
+
+
+    /*
+     * Render Telegraph's node structure
+     */
+
+    renderNodes(
+        gallery.content,
+        viewerContent
+    );
+
+
+    /*
+     * Scroll to top
+     */
+
+    viewerBody.scrollTop = 0;
+
+}
+
+
+// ============================================================
+// RENDER TELEGRAPH NODES
+// ============================================================
+
+function renderNodes(
+    nodes,
+    parent
+) {
+
+    if (!Array.isArray(nodes)) {
+        return;
+    }
+
+
+    nodes.forEach(
+        node => {
+
+            if (!node || !node.tag) {
+                return;
+            }
+
+
+            // -------------------------------------------------
+            // IMAGE
+            // -------------------------------------------------
+
+            if (
+                node.tag === "img"
+            ) {
+
+                if (
+                    node.attrs &&
+                    node.attrs.src
+                ) {
+
+                    const image =
+                        document.createElement(
+                            "img"
+                        );
+
+                    image.className =
+                        "telegraph-image";
+
+                    image.src =
+                        node.attrs.src;
+
+                    image.loading =
+                        "lazy";
+
+                    image.alt =
+                        "";
+
+
+                    image.onclick =
+                        () => {
+
+                            openLightbox(
+                                image.src
+                            );
+
+                        };
+
+
+                    parent.appendChild(
+                        image
+                    );
+
+                }
+
+                return;
+
+            }
+
+
+            // -------------------------------------------------
+            // FIGURE
+            // -------------------------------------------------
+
+            if (
+                node.tag === "figure"
+            ) {
+
+                const figure =
+                    document.createElement(
+                        "figure"
+                    );
+
+                renderNodes(
+                    node.children,
+                    figure
+                );
+
+                parent.appendChild(
+                    figure
+                );
+
+                return;
+
+            }
+
+
+            // -------------------------------------------------
+            // TEXT / HTML ELEMENTS
+            // -------------------------------------------------
+
+            const allowed = [
+
+                "p",
+                "h1",
+                "h2",
+                "h3",
+                "h4",
+                "h5",
+                "h6",
+                "blockquote",
+                "pre",
+                "code",
+                "ul",
+                "ol",
+                "li",
+                "a",
+                "strong",
+                "em",
+                "br",
+                "hr"
+
+            ];
+
+
+            let tag =
+                allowed.includes(
+                    node.tag
+                )
+                    ? node.tag
+                    : "div";
+
+
+            const element =
+                document.createElement(
+                    tag
+                );
+
+
+            // -------------------------------------------------
+            // SAFE ATTRIBUTES
+            // -------------------------------------------------
+
+            if (
+                node.attrs
+            ) {
+
+                if (
+                    node.attrs.href &&
+                    tag === "a"
+                ) {
+
+                    element.href =
+                        node.attrs.href;
+
+                    element.target =
+                        "_blank";
+
+                    element.rel =
+                        "noopener noreferrer";
+
+                }
+
+            }
+
+
+            // -------------------------------------------------
+            // CHILDREN
+            // -------------------------------------------------
+
+            if (
+                Array.isArray(
+                    node.children
+                )
+            ) {
+
+                node.children.forEach(
+                    child => {
+
+                        if (
+                            typeof child ===
+                            "string"
+                        ) {
+
+                            element.appendChild(
+                                document.createTextNode(
+                                    child
+                                )
+                            );
+
+                        }
+                        else {
+
+                            renderNodes(
+                                [child],
+                                element
+                            );
+
+                        }
+
+                    }
+                );
+
+            }
+
+
+            parent.appendChild(
+                element
+            );
+
+        }
+    );
+
+}
+
+
+// ============================================================
+// PREVIOUS
+// ============================================================
+
+function previousGallery() {
+
+    if (
+        currentIndex <= 0
+    ) {
+
+        return;
+
+    }
+
+
+    currentIndex--;
+
+
+    renderViewer();
+
+
+    updateURL();
+
+}
+
+
+// ============================================================
+// NEXT
+// ============================================================
+
+function nextGallery() {
+
+    if (
+        currentIndex >=
+        galleries.length - 1
+    ) {
+
+        return;
+
+    }
+
+
+    currentIndex++;
+
+
+    renderViewer();
+
+
+    updateURL();
+
+}
+
+
+// ============================================================
+// CLOSE VIEWER
+// ============================================================
+
+function closeViewer() {
+
+    viewer.classList.remove(
+        "open"
+    );
+
+
+    document.body.style.overflow =
+        "";
+
+
+    currentIndex = -1;
+
+
+    /*
+     * Remove gallery state from URL.
+     */
+
+    history.replaceState(
+        {},
+        "",
+        location.pathname
+    );
+
+}
+
+
+// ============================================================
+// KEYBOARD NAVIGATION
+// ============================================================
+
+document.addEventListener(
+    "keydown",
+    event => {
+
+        if (
+            !viewer.classList.contains(
+                "open"
+            )
+        ) {
+
+            return;
+
+        }
+
+
+        if (
+            event.key === "ArrowLeft"
+        ) {
+
+            previousGallery();
+
+        }
+
+
+        if (
+            event.key === "ArrowRight"
+        ) {
+
+            nextGallery();
+
+        }
+
+
+        if (
+            event.key === "Escape"
+        ) {
+
+            closeViewer();
+
+        }
+
+    }
+);
+
+
+// ============================================================
+// MOBILE SWIPE
+// ============================================================
+
+viewer.addEventListener(
+    "touchstart",
+    event => {
+
+        touchStartX =
+            event.changedTouches[0].screenX;
+
+    },
+    {
+        passive: true
+    }
+);
+
+
+viewer.addEventListener(
+    "touchend",
+    event => {
+
+        const endX =
+            event.changedTouches[0].screenX;
+
+        const difference =
+            endX - touchStartX;
+
+
+        /*
+         * Swipe right
+         * = Previous
+         */
+
+        if (
+            difference > 70
+        ) {
+
+            previousGallery();
+
+        }
+
+
+        /*
+         * Swipe left
+         * = Next
+         */
+
+        else if (
+            difference < -70
+        ) {
+
+            nextGallery();
+
+        }
+
+    },
+    {
+        passive: true
+    }
+);
+
+
+// ============================================================
+// LIGHTBOX
+// ============================================================
+
+function openLightbox(
+    src
+) {
+
+    const lightbox =
+        document.getElementById(
+            "lightbox"
+        );
+
+    const image =
+        document.getElementById(
+            "lightboxImage"
+        );
+
+
+    image.src =
+        src;
+
+
+    lightbox.classList.add(
+        "open"
+    );
+
+}
+
+
+function closeLightbox() {
+
+    document
+        .getElementById(
+            "lightbox"
+        )
+        .classList.remove(
+            "open"
+        );
+
+}
+
+
+// ============================================================
+// URL STATE
+// ============================================================
+
+function updateURL() {
+
+    const gallery =
+        galleries[currentIndex];
+
+
+    if (!gallery) {
+        return;
+    }
+
+
+    const params =
+        new URLSearchParams();
+
+
+    params.set(
+        "month",
+        currentMonth
+    );
+
+
+    params.set(
+        "day",
+        gallery.day
+    );
+
+
+    history.replaceState(
+        {},
+        "",
+        "?" +
+        params.toString()
+    );
+
+}
+
+
+// ============================================================
+// INITIALIZE
+// ============================================================
+
+buildMonthButtons();
+
+setActiveMonth();
+
+loadMonth(
+    MONTHS[0]
+);
+
+</script>
+
+</body>
+
+</html>
